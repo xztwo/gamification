@@ -5,10 +5,6 @@ import {
   calculateModuleReward,
   initializeEmployee,
   checkNewAchievements,
-  saveEmployeeData,
-  loadEmployeeData,
-  saveToLeaderboard,
-  getLeaderboard,
 } from './gamification';
 import { Employee } from '../types';
 
@@ -23,7 +19,6 @@ function createEmployee(overrides: Partial<Employee> = {}): Employee {
 
 describe('gamification utils', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -80,62 +75,4 @@ describe('gamification utils', () => {
     expect(unlocked).toContain('daily-rhythm');
     expect(unlocked).not.toContain('first-steps');
   });
-
-  it('сохраняет и мигрирует профиль сотрудника из localStorage', () => {
-    const legacyProfile = {
-      id: 'legacy-id',
-      name: 'Legacy',
-      totalPoints: 10,
-      level: 'novice',
-      completedModules: [],
-      unlockedAchievements: [],
-      perfectModules: 0,
-    };
-    localStorage.setItem('hotelEmployee', JSON.stringify(legacyProfile));
-
-    const loaded = loadEmployeeData();
-    expect(loaded).toMatchObject({
-      id: 'legacy-id',
-      totalModulesCompleted: 0,
-      perfectStreak: 0,
-      bestPerfectStreak: 0,
-      dailyStreak: 0,
-    });
-
-    const current = createEmployee({ totalPoints: 220 });
-    saveEmployeeData(current);
-    expect(loadEmployeeData()).toMatchObject({ totalPoints: 220 });
-  });
-
-  it('поддерживает топ-10 лидерборда и обновляет запись сотрудника', () => {
-    for (let i = 0; i < 12; i += 1) {
-      saveToLeaderboard(
-        createEmployee({
-          id: `id-${i}`,
-          name: `Сотрудник ${i}`,
-          totalPoints: i * 100,
-          level: 'novice',
-          completedModules: ['a'],
-        }),
-      );
-    }
-
-    const beforeUpdate = getLeaderboard();
-    expect(beforeUpdate).toHaveLength(10);
-    expect(beforeUpdate[0].totalPoints).toBe(1100);
-
-    saveToLeaderboard(
-      createEmployee({
-        id: 'id-1',
-        name: 'Сотрудник 1',
-        totalPoints: 2000,
-        level: 'master',
-      }),
-    );
-
-    const afterUpdate = getLeaderboard();
-    expect(afterUpdate[0]).toMatchObject({ id: 'id-1', totalPoints: 2000, level: 'master' });
-    expect(afterUpdate).toHaveLength(10);
-  });
 });
-

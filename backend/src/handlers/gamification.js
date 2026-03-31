@@ -1,4 +1,4 @@
-function getGamificationHandler(repo) {
+function getGamificationHandler({ pool, repo }) {
   return async (req, res) => {
     try {
       const clientId = req.query.ID_clients;
@@ -6,9 +6,18 @@ function getGamificationHandler(repo) {
         return res.status(400).json({ error: 'ID_clients обязателен' });
       }
 
-      const totalPoints = repo.getPointsByClientId(clientId);
-      const currentLevel = repo.getLevelByPoints(totalPoints);
-      const nextLevel = repo.getNextLevel(currentLevel);
+      const exists = await repo.hasEmployee(pool, clientId);
+      if (!exists) {
+        return res.json({
+          total_points: 0,
+          current_level: null,
+          next_level: null,
+        });
+      }
+
+      const totalPoints = await repo.getTotalPoints(pool, clientId);
+      const currentLevel = await repo.getCurrentLevel(pool, totalPoints);
+      const nextLevel = await repo.getNextLevel(pool, currentLevel);
 
       return res.json({
         total_points: totalPoints,

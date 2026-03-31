@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "dev:backend": "npm run start --prefix backend",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ci": "vitest run --reporter=default",

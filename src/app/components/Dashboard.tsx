@@ -9,15 +9,19 @@ import { TRAINING_MODULES } from '../data/modules';
 import { ACHIEVEMENTS } from '../data/achievements';
 import {
   calculateLevel,
-  saveEmployeeData,
-  loadEmployeeData,
   initializeEmployee,
   checkNewAchievements,
-  saveToLeaderboard,
   calculateModuleReward,
   RewardBreakdown,
   updateDailyStreak,
 } from '../utils/gamification';
+import {
+  SESSION_EMPLOYEE_ID_KEY,
+  fetchEmployee,
+  createEmployee,
+  updateEmployee,
+  deleteEmployeeRemote,
+} from '../api/gamificationApi';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -106,20 +110,48 @@ export function Dashboard() {
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [lastReward, setLastReward] = useState<LastReward | null>(null);
+  const [leaderboardRefresh, setLeaderboardRefresh] = useState(0);
 
   useEffect(() => {
-    const savedEmployee = loadEmployeeData();
-    if (savedEmployee) setEmployee(savedEmployee);
-    else setShowWelcome(true);
+    let cancelled = false;
+    (async () => {
+      const id = sessionStorage.getItem(SESSION_EMPLOYEE_ID_KEY);
+      if (!id) {
+        if (!cancelled) setShowWelcome(true);
+        return;
+      }
+      try {
+        const saved = await fetchEmployee(id);
+        if (cancelled) return;
+        if (!saved) {
+          sessionStorage.removeItem(SESSION_EMPLOYEE_ID_KEY);
+          setShowWelcome(true);
+          return;
+        }
+        setEmployee(saved);
+        setShowWelcome(false);
+      } catch {
+        if (!cancelled) setShowWelcome(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const handleStartTraining = (name: string) => {
+  const handleStartTraining = async (name: string) => {
     const newEmployee = initializeEmployee();
     newEmployee.name = name || COPY.defaultName;
-    setEmployee(newEmployee);
-    saveEmployeeData(newEmployee);
-    setShowWelcome(false);
-    toast.success(`${COPY.welcome}, ${newEmployee.name}!`);
+    try {
+      await createEmployee(newEmployee);
+      sessionStorage.setItem(SESSION_EMPLOYEE_ID_KEY, newEmployee.id);
+      setEmployee(newEmployee);
+      setShowWelcome(false);
+      setLeaderboardRefresh((n) => n + 1);
+      toast.success(`${COPY.welcome}, ${newEmployee.name}!`);
+    } catch {
+      toast.error('Не удалось создать профиль в базе данных');
+    }
   };
 
   const handleModuleComplete = (
@@ -136,7 +168,9 @@ export function Dashboard() {
         perfectStreak: 0,
       };
       setEmployee(failedAttempt);
-      saveEmployeeData(failedAttempt);
+      void updateEmployee(failedAttempt).catch(() => {
+        toast.error('Не удалось сохранить прогресс');
+      });
       setActiveModule(null);
       toast.error(COPY.timeOver, { description: COPY.retryModule });
       return;
@@ -187,8 +221,13 @@ export function Dashboard() {
     }
 
     setEmployee(updatedEmployee);
-    saveEmployeeData(updatedEmployee);
-    saveToLeaderboard(updatedEmployee);
+    void updateEmployee(updatedEmployee)
+      .then(() => {
+        setLeaderboardRefresh((n) => n + 1);
+      })
+      .catch(() => {
+        toast.error('Не удалось сохранить прогресс в базе данных');
+      });
     setActiveModule(null);
     setLastReward({ ...reward, moduleTitle: module.title, wasPerfect: isPerfect });
 
@@ -199,10 +238,17 @@ export function Dashboard() {
 
   const handleReset = () => {
     if (confirm(COPY.confirmReset)) {
-      localStorage.removeItem('hotelEmployee');
+      const id = employee?.id;
+      if (id) {
+        void deleteEmployeeRemote(id).catch(() => {
+          toast.error('Не удалось удалить профиль из базы');
+        });
+      }
+      sessionStorage.removeItem(SESSION_EMPLOYEE_ID_KEY);
       setEmployee(null);
       setShowWelcome(true);
       setActiveModule(null);
+      setLeaderboardRefresh((n) => n + 1);
       toast.info(COPY.progressReset);
     }
   };
@@ -378,7 +424,7 @@ export function Dashboard() {
               <TabsTrigger value="achievements" className="text-base">{COPY.achievements}</TabsTrigger>
             </TabsList>
             <TabsContent value="leaderboard">
-              <Leaderboard currentEmployeeId={employee.id} />
+              <Leaderboard currentEmployeeId={employee.id} refreshKey={leaderboardRefresh} />
             </TabsContent>
             <TabsContent value="achievements">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -1,4 +1,4 @@
-﻿import { EmployeeLevel, Employee, LeaderboardEntry } from '../types';
+import { EmployeeLevel, Employee } from '../types';
 import { ACHIEVEMENTS } from '../data/achievements';
 
 export const LEVEL_THRESHOLDS = {
@@ -76,33 +76,6 @@ function calculateDayDiff(fromISO: string, toISO: string): number {
   const to = new Date(`${toISO}T00:00:00`);
   const diffMs = to.getTime() - from.getTime();
   return Math.floor(diffMs / (24 * 60 * 60 * 1000));
-}
-
-function migrateEmployee(employee: Employee): Employee {
-  return {
-    ...employee,
-    totalModulesCompleted: employee.totalModulesCompleted ?? employee.completedModules.length,
-    perfectStreak: employee.perfectStreak ?? 0,
-    bestPerfectStreak: employee.bestPerfectStreak ?? 0,
-    dailyStreak: employee.dailyStreak ?? 0,
-  };
-}
-
-export function saveEmployeeData(employee: Employee): void {
-  localStorage.setItem('hotelEmployee', JSON.stringify(employee));
-}
-
-export function loadEmployeeData(): Employee | null {
-  const data = localStorage.getItem('hotelEmployee');
-  if (!data) return null;
-
-  try {
-    const parsed = JSON.parse(data) as Employee;
-    return migrateEmployee(parsed);
-  } catch {
-    localStorage.removeItem('hotelEmployee');
-    return null;
-  }
 }
 
 export function initializeEmployee(): Employee {
@@ -185,49 +158,6 @@ export function checkNewAchievements(employee: Employee): string[] {
   });
 
   return newAchievements;
-}
-
-export function saveToLeaderboard(employee: Employee): void {
-  const leaderboardData = localStorage.getItem('hotelLeaderboard');
-  let leaderboard: LeaderboardEntry[] = [];
-
-  if (leaderboardData) {
-    try {
-      leaderboard = JSON.parse(leaderboardData) as LeaderboardEntry[];
-    } catch {
-      localStorage.removeItem('hotelLeaderboard');
-    }
-  }
-
-  leaderboard = leaderboard.filter((entry) => entry.id !== employee.id);
-
-  const entry: LeaderboardEntry = {
-    id: employee.id,
-    name: employee.name,
-    totalPoints: employee.totalPoints,
-    level: employee.level,
-    completedModules: employee.completedModules.length,
-    perfectModules: employee.perfectModules,
-    fastestTime: employee.fastestTime,
-  };
-
-  leaderboard.push(entry);
-  leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-  leaderboard = leaderboard.slice(0, 10);
-
-  localStorage.setItem('hotelLeaderboard', JSON.stringify(leaderboard));
-}
-
-export function getLeaderboard(): LeaderboardEntry[] {
-  const data = localStorage.getItem('hotelLeaderboard');
-  if (!data) return [];
-
-  try {
-    return JSON.parse(data) as LeaderboardEntry[];
-  } catch {
-    localStorage.removeItem('hotelLeaderboard');
-    return [];
-  }
 }
 
 export function formatTime(seconds: number): string {

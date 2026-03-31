@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { LeaderboardEntry } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { LevelBadge } from './LevelBadge';
-import { getLeaderboard, formatTime } from '../utils/gamification';
+import { formatTime } from '../utils/gamification';
+import { fetchLeaderboard } from '../api/gamificationApi';
 import { Trophy, Medal, Award, Clock, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LeaderboardProps {
   currentEmployeeId?: string;
+  refreshKey?: number;
 }
 
 const COPY = {
@@ -19,12 +21,22 @@ const COPY = {
   modules: '\u043c\u043e\u0434\u0443\u043b\u0435\u0439',
 };
 
-export function Leaderboard({ currentEmployeeId }: LeaderboardProps) {
+export function Leaderboard({ currentEmployeeId, refreshKey = 0 }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
-    setLeaderboard(getLeaderboard());
-  }, []);
+    let cancelled = false;
+    fetchLeaderboard()
+      .then((rows) => {
+        if (!cancelled) setLeaderboard(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setLeaderboard([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
 
   const getMedalIcon = (position: number) => {
     switch (position) {

@@ -10,11 +10,12 @@ function createRes() {
 describe('GET /api/gamification handler (unit)', () => {
   test('returns 400 when ID_clients is missing', async () => {
     const repo = {
-      getPointsByClientId: jest.fn(),
-      getLevelByPoints: jest.fn(),
+      hasEmployee: jest.fn(),
+      getTotalPoints: jest.fn(),
+      getCurrentLevel: jest.fn(),
       getNextLevel: jest.fn(),
     };
-    const handler = getGamificationHandler(repo);
+    const handler = getGamificationHandler({ pool: {}, repo });
     const req = { query: {} };
     const res = createRes();
 
@@ -22,18 +23,20 @@ describe('GET /api/gamification handler (unit)', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ error: 'ID_clients обязателен' });
-    expect(repo.getPointsByClientId).not.toHaveBeenCalled();
+    expect(repo.getTotalPoints).not.toHaveBeenCalled();
+    expect(repo.hasEmployee).not.toHaveBeenCalled();
   });
 
   test('returns gamification payload when repo returns data', async () => {
     const current = { id_level: 2, level_name: '2', min_points: 200, max_points: 399, discount_percent: 3 };
     const next = { id_level: 3, level_name: '3', min_points: 400, max_points: 599, discount_percent: 5 };
     const repo = {
-      getPointsByClientId: jest.fn().mockReturnValue(250),
-      getLevelByPoints: jest.fn().mockReturnValue(current),
-      getNextLevel: jest.fn().mockReturnValue(next),
+      hasEmployee: jest.fn().mockResolvedValue(true),
+      getTotalPoints: jest.fn().mockResolvedValue(250),
+      getCurrentLevel: jest.fn().mockResolvedValue(current),
+      getNextLevel: jest.fn().mockResolvedValue(next),
     };
-    const handler = getGamificationHandler(repo);
+    const handler = getGamificationHandler({ pool: {}, repo });
     const req = { query: { ID_clients: '10' } };
     const res = createRes();
 
@@ -49,13 +52,14 @@ describe('GET /api/gamification handler (unit)', () => {
 
   test('returns 500 when repository throws', async () => {
     const repo = {
-      getPointsByClientId: jest.fn(() => {
+      hasEmployee: jest.fn().mockResolvedValue(true),
+      getTotalPoints: jest.fn(() => {
         throw new Error('db down');
       }),
-      getLevelByPoints: jest.fn(),
+      getCurrentLevel: jest.fn(),
       getNextLevel: jest.fn(),
     };
-    const handler = getGamificationHandler(repo);
+    const handler = getGamificationHandler({ pool: {}, repo });
     const req = { query: { ID_clients: '7' } };
     const res = createRes();
 

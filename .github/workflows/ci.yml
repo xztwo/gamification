@@ -8,8 +8,30 @@ on:
 
 jobs:
   test-and-build:
-    name: Build and test gamification subsystem
+    name: Тесты и сборка подсистемы геймификации
     runs-on: ubuntu-latest
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: gamification
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: gamification
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gamification"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -20,17 +42,27 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Установка зависимостей (frontend)
         run: npm ci
 
-      - name: Install backend dependencies
+      - name: Установка зависимостей (backend)
         run: npm ci --prefix backend
 
-      - name: Run all tests (client + server)
-        run: npm run test:all
+      - name: Модульные тесты клиента (Vitest)
+        run: npm run test:client:unit
 
-      - name: Build frontend
+      - name: Интеграционные тесты клиента (Vitest)
+        run: npm run test:client:integration
+
+      - name: Модульные тесты сервера (Jest)
+        run: npm run test:server:unit
+
+      - name: Интеграционные тесты сервера (Jest + PostgreSQL)
+        run: npm run test:server:integration
+
+      - name: Сборка frontend (Vite)
         run: npm run build
-
